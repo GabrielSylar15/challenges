@@ -5,7 +5,6 @@ import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.vinhnt.lab.consumer.BusinessLogicConsumer;
-import com.vinhnt.lab.consumer.GenericExceptionHandler;
 import com.vinhnt.lab.consumer.JournalConsumer;
 import com.vinhnt.lab.consumer.ReplicationConsumer;
 import com.vinhnt.lab.event.EventObject;
@@ -53,12 +52,12 @@ public class Main {
         BatchEventProcessor<EventObject> batchEventProcessorApplication =
                 new BatchEventProcessorBuilder().build(ringBuffer, sequenceBarrier, applicationConsumer);
 
-//        ringBuffer.addGatingSequences(batchEventProcessorApplication.getSequence());
+        ringBuffer.addGatingSequences(batchEventProcessorApplication.getSequence());
 
-        disruptor.handleEventsWith(batchEventProcessorJournal, batchEventProcessorReplication, batchEventProcessorApplication);
-//        executor.submit(batchEventProcessorJournal);
-//        executor.submit(batchEventProcessorReplication);
-//        executor.submit(batchEventProcessorApplication);
+        disruptor.handleEventsWith(journalConsumer)
+                .then(replicationConsumer)
+                .then(applicationConsumer);
+
 
         disruptor.start();
         long startTime = System.nanoTime();
