@@ -13,6 +13,6 @@ public class ReplicationConsumer implements WorkHandler<EventObject> {
         } catch (Exception ex) {
             System.out.println("Thread handler error" + ex.getMessage());
         }
-        System.out.println("ReplicationConsumer handler " + eventObject.getCorrelationId());
+//        System.out.println("ReplicationConsumer handler " + eventObject.getCorrelationId());
     }
 }

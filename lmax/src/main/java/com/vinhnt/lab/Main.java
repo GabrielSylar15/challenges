@@ -9,6 +9,9 @@ import com.vinhnt.lab.consumer.JournalConsumer;
 import com.vinhnt.lab.consumer.ReplicationConsumer;
 import com.vinhnt.lab.event.EventObject;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,31 +29,28 @@ public class Main {
     public static void main(String[] args) {
 
         ExecutorService executor = Executors.newFixedThreadPool(NUM_EVENT_PROCESSORS, DaemonThreadFactory.INSTANCE);
-//        ThreadFactory factory = Executors.defaultThreadFactory();
-        final ThreadFactory factory = Thread.ofVirtual().factory();
+        ThreadFactory factory = Executors.defaultThreadFactory();
+//        final ThreadFactory factory = Thread.ofVirtual().factory();
 
         Disruptor<EventObject> disruptor = new Disruptor<>(
                 EventObject.EVENT_FACTORY,
                 BUFFER_SIZE,
                 factory,
                 ProducerType.SINGLE,
-                new SleepingWaitStrategy()
+                new YieldingWaitStrategy()
         );
 
         RingBuffer<EventObject> ringBuffer = disruptor.getRingBuffer();
-//        JournalConsumer journalConsumer = new JournalConsumer();
-//        ReplicationConsumer replicationConsumer = new ReplicationConsumer();
-//        BusinessLogicConsumer applicationConsumer = new BusinessLogicConsumer();
 
         WorkHandler<EventObject> journalConsumer = new JournalConsumer();
         WorkHandler<EventObject> replicationConsumer = new ReplicationConsumer();
         WorkHandler<EventObject> applicationConsumer = new BusinessLogicConsumer();
 
-        WorkHandler<EventObject>[] journalConsumers = new WorkHandler[800];
+        WorkHandler<EventObject>[] journalConsumers = new WorkHandler[2000];
         Arrays.fill(journalConsumers, journalConsumer);
-        WorkHandler<EventObject>[] replicationConsumers = new WorkHandler[800];
+        WorkHandler<EventObject>[] replicationConsumers = new WorkHandler[2000];
         Arrays.fill(replicationConsumers, replicationConsumer);
-        WorkHandler<EventObject>[] applicationConsumers = new WorkHandler[800];
+        WorkHandler<EventObject>[] applicationConsumers = new WorkHandler[2000];
         Arrays.fill(applicationConsumers, applicationConsumer);
 
 
@@ -61,7 +61,7 @@ public class Main {
 
         disruptor.start();
         long startTime = System.currentTimeMillis();
-        for (long i = 0; i < 10_000; i++) {
+        for (long i = 0; i < 100_000; i++) {
             long sequence = ringBuffer.next();
             try {
                 EventObject event = ringBuffer.get(sequence);
@@ -74,7 +74,30 @@ public class Main {
         disruptor.shutdown();
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
+
         System.out.println("Processing time for messages: " + duration + "ms");
+    }
+
+    private static void checkDeadlocks() {
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+
+        // Kiểm tra xem hệ thống có hỗ trợ thread contention và deadlock detection hay không
+        if (threadMXBean.isThreadContentionMonitoringSupported()) {
+            threadMXBean.setThreadContentionMonitoringEnabled(true);
+        }
+
+        // Lấy danh sách các deadlock
+        long[] deadlockedThreads = threadMXBean.findDeadlockedThreads();
+
+        if (deadlockedThreads != null && deadlockedThreads.length > 0) {
+            System.out.println("Deadlock detected!");
+            for (long threadId : deadlockedThreads) {
+                ThreadInfo threadInfo = threadMXBean.getThreadInfo(threadId);
+                System.out.println("Thread " + threadInfo.getThreadName() + " is deadlocked.");
+            }
+        } else {
+            System.out.println("No deadlock detected.");
+        }
     }
 
 }

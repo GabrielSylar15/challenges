@@ -13,7 +13,7 @@ public class JournalConsumer implements WorkHandler<EventObject> {
             System.out.println("Thread handler error" + ex.getMessage());
 
         }
-        System.out.println("JournalConsumer handler " + eventObject.getCorrelationId());
+//        System.out.println("JournalConsumer handler " + eventObject.getCorrelationId());
     }
 
 }
