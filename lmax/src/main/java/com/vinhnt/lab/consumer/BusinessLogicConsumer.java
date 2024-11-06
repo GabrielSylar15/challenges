@@ -1,12 +1,12 @@
 package com.vinhnt.lab.consumer;
 
-import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.WorkHandler;
 import com.vinhnt.lab.event.EventObject;
 
-public class BusinessLogicConsumer implements EventHandler<EventObject> {
+public class BusinessLogicConsumer implements WorkHandler<EventObject> {
 
     @Override
-    public void onEvent(EventObject eventObject, long l, boolean b) throws Exception {
+    public void onEvent(EventObject eventObject) throws Exception {
         try {
             Thread.sleep(200);
         } catch (Exception ex) {
