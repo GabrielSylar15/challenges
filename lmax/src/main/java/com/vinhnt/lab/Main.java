@@ -7,6 +7,7 @@ import com.lmax.disruptor.util.DaemonThreadFactory;
 import com.vinhnt.lab.consumer.BusinessLogicConsumer;
 import com.vinhnt.lab.consumer.JournalConsumer;
 import com.vinhnt.lab.consumer.ReplicationConsumer;
+import com.vinhnt.lab.consumer.WorkDistributor;
 import com.vinhnt.lab.event.EventObject;
 
 import java.util.concurrent.ExecutorService;
@@ -35,32 +36,24 @@ public class Main {
                 new YieldingWaitStrategy()
         );
 
-        RingBuffer<EventObject> ringBuffer = disruptor.getRingBuffer();
-        SequenceBarrier sequenceBarrier = ringBuffer.newBarrier();
+        JournalConsumer[] journalConsumers = new JournalConsumer[NUM_EVENT_PROCESSORS];
 
-        JournalConsumer journalConsumer = new JournalConsumer();
-        BatchEventProcessor<EventObject> batchEventProcessorJournal =
-                new BatchEventProcessorBuilder().build(ringBuffer, sequenceBarrier, journalConsumer);
+        RingBuffer<EventObject> ringBuffer = disruptor.getRingBuffer();
+        WorkDistributor workDistributor = new WorkDistributor(NUM_EVENT_PROCESSORS);
+        JournalConsumer journalConsumer = new JournalConsumer(0, workDistributor);
+        JournalConsumer journalConsumer2 = new JournalConsumer(1, workDistributor);
+        JournalConsumer journalConsumer3 = new JournalConsumer(2, workDistributor);
 
         ReplicationConsumer replicationConsumer = new ReplicationConsumer();
-        BatchEventProcessor<EventObject> batchEventProcessorReplication =
-                new BatchEventProcessorBuilder().build(ringBuffer, sequenceBarrier, replicationConsumer);
 
-        SequenceBarrier sequenceBarrierConclusion =
-                ringBuffer.newBarrier(batchEventProcessorJournal.getSequence(), batchEventProcessorReplication.getSequence());
         BusinessLogicConsumer applicationConsumer = new BusinessLogicConsumer();
-        BatchEventProcessor<EventObject> batchEventProcessorApplication =
-                new BatchEventProcessorBuilder().build(ringBuffer, sequenceBarrier, applicationConsumer);
 
-        ringBuffer.addGatingSequences(batchEventProcessorApplication.getSequence());
-
-        disruptor.handleEventsWith(journalConsumer)
+        disruptor.handleEventsWith(journalConsumer, journalConsumer2, journalConsumer3)
                 .then(replicationConsumer)
                 .then(applicationConsumer);
 
-
         disruptor.start();
-        long startTime = System.nanoTime();
+        long startTime = System.currentTimeMillis();
         for (long i = 0; i < 150; i++) {
             long sequence = ringBuffer.next();
             try {
@@ -71,7 +64,7 @@ public class Main {
                 ringBuffer.publish(sequence);
             }
         }
-        long endTime = System.nanoTime();
+        long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
         double durationInSeconds = duration / 1_000_000_000.0; // Chuyển đổi sang giây
 
